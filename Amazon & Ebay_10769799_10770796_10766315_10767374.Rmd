@@ -1,0 +1,851 @@
+---
+title: Twitter Users Opinion about Ecommerce business using Amazon and eBay as case
+  study
+author: "1076979_10770796_10766315_10767374"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+Introduction
+In this kernel, we are going to analyze two trending contrast business topics on twitter, which are #amazon and #ebay. 
+
+
+Step 1
+Capturing Twitter data
+In order to capture Twitter data, you have to follow the next steps:
+A. Install the package rtweet
+B. Load the package , with library(rtweet)
+C. i.Most of the parameter for function "search_tweets are default" , but you can set some that are important , such as "q": the hash tag you are searching for. 
+II. Set parameter "lang" to en, which means you want to returned all the data in English languages on twitter.
+III.Set parameter "include_rt" to 'True' in order to return the "rtweet" data.
+
+
+```{r}
+#Here, load the package "rtweet" and pull the #amazon data from twitter, to variable amazon_df, setting the total number of data we are expecting to 5000 rows
+#library(rtweet)
+
+#amazon_df<-search_tweets("#amazon", n= 5000,include_rts = TRUE,geocode = NULL,lang="en")
+
+
+```
+
+```{r}
+#Here, since we already load the package "rtweet" for pulling amazon hashtag, we just go ahead to pull our ebay data without loading the rtweet package again, setting the total number of data we are expecting to 5000 rows
+#ebay_df<-search_tweets("#ebay", n= 5000,include_rts =TRUE,geocode = NULL,lang="en")
+```
+
+
+```{r}
+#setting our working directory 
+#setwd("C:/Users/mizni/Desktop/School Document/MAT 513/MAT513PROJ/first_task")
+```
+
+```{r}
+#saving our pulled data as csv
+#save_as_csv(amazon_df, "amazon.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+#save_as_csv(ebay_df, "ebay.csv", prepend_ids = TRUE, na = "", fileEncoding = "UTF-8")
+```
+
+
+```{r}
+#reading our data from working directory
+amazon_df = read.csv("amazon.csv",header=TRUE)
+ebay_df = read.csv("ebay.csv",header=TRUE)
+```
+
+Step2
+Loading the necessary packages, loading the data  and Cleaning the data up
+A.
+Loading the necessary packages
+Packages:"tidytext,tidyverse,lubricate,textdata,plyr,stringr,dplyr,tm", where used manipulation of data and data cleaning
+Packages:"ggpubr,ggplot,ggeasy,igrapgh,ggrapgh", where used for plotting and manipulating of graphs
+Packages : "syuzhet", where used for sentiment analysis
+Packages :"wordcloud,wordcloud2", where used for word cloud
+```{r}
+#Loading of our packages
+library(scales)
+library(tidyverse)
+library(ggplot2)
+library(rtweet)
+library(lubridate)
+library(textdata)
+library(stringr)
+library(ggeasy)
+library(igraph)
+library(tm)
+library(syuzhet)
+library(wordcloud2)
+library(wordcloud)
+library(devtools)
+library(tseries)
+```
+B. Loading of the data and checking of the pulled data. Here, we used "head" and "colnames" function.
+```{r}
+#Here, we have loaded the data and seeing the data structure of the amazon data we pulled, using function("head")
+head(amazon_df)
+```
+```{r}
+#checking number of columns, using function("colnames")
+colnames(amazon_df)
+```
+```{r}
+#checking the first six structure of ebay too,using function("head")
+head(ebay_df)
+```
+
+```{r}
+#checking the column names for ebay too, using function ("colnames")
+colnames(ebay_df)
+```
+
+C.i Selecting the columns needed from the about 90columns pulled from twitter.
+```{r}
+#Here, we used the function "select" from the range of columns gotten from twitter
+amazon_df_select <- select(amazon_df,"created_at","screen_name","text","source","retweet_count","place_url","country","geo_coords","name" ,"location","lang","verified","followers_count","friends_count","listed_count","statuses_count","favourites_count")
+```
+
+```{r}
+#Here, we used the function "select" from the range of columns gotten from twitter
+ebay_df_select <- select(ebay_df,"created_at","screen_name","text","source","retweet_count","place_url","country","geo_coords","name" ,"location","lang","verified","followers_count","friends_count","listed_count","statuses_count","favourites_count")
+```
+
+D. Cleaning up of the data
+We created a function (clean_tweet) to clean the data.
+
+Here,we used "str_remove_all","str_replace_all","str_to_lower" , "str_trim" to form the function (clean_tweets)
+```{r}
+library(dplyr)
+library(tidytext)
+library(tidyr)
+clean_tweets <- function(x) {
+                    x %>%
+                            # Remove URLs
+                    str_remove_all(" ?(f|ht)(tp)(s?)(://)(.*)[.|/](.*)") %>%
+                            # Remove mentions e.g. "@my_account
+                                                                        str_remove_all("@[[:alnum:]_]{4,}")%>%
+                            # Remove hashtags
+                                                                        str_remove_all("#[[:alnum:]_]+") %>%
+                            # Replace "&" character reference with "and"
+    
+                                                                        str_replace_all("clickgtgt", "")%>%
+                            #Remove "clickgtgt"
+                 str_replace_all("&amp;", "and") %>%
+                            # Remove puntucation, using a standard                                     character class
+                                                                        str_remove_all("[[:punct:]]") %>%
+                            # Remove "RT: " from beginning of retweets
+                 str_remove_all("^RT:? ") %>%
+
+                 str_remove_all("2")%>%
+                            #Remove "2"
+                            # Replace any newline characters with a space
+                 str_replace_all("\\\n", " ") %>%
+                            # Make everything lowercase
+                 str_to_lower() %>%
+                            # Remove any trailing whitespace around the text
+                 str_trim("both")
+}
+
+```
+
+Step 3
+Explanatory Data Analysis /Visualization 
+
+A.Users 
+```{r}
+#using library scales for converting scientific figure to comma
+library(scales)
+ggplot(amazon_df_select, aes(friends_count, followers_count)) +
+  geom_point(aes(col = "Amazon")) +
+  geom_smooth(span=1)+ #used scale_y_continuous to change any scientific figure for y-axis
+scale_y_continuous(labels = comma)+
+  #used labs for labelling
+  labs( x = "friends count", 
+        y = "followers count",
+        title = "Scatterplot for Users Followers and Friends Count",
+        subtitle = "Relationship between Amazon Users friend and followers count",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #amazon") +
+  xlim(0, 10000) +
+  ylim(0, 10000)+
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12))  
+
+```
+
+```{r}
+ggplot(ebay_df_select, aes(friends_count, followers_count)) +
+  geom_point(aes(col = "eBay")) +
+  geom_smooth(span=1)+ 
+  #used scale_y_continuous to change any scientific figure for y-axis
+scale_y_continuous(labels = comma)+
+  #used labs for labelling
+  labs( x = "friends count", 
+        y = "followers count",
+        title = "Scatterplot for Users Followers and Friends Count",
+        subtitle = "Relationship between eBay Users friend and followers count",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #ebay") +
+  xlim(0, 10000) +
+  ylim(0, 10000)+
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12))  
+
+```
+Conclusion:
+```{r}
+#here , we combined geom point and geom line together, in order to show the difference between amazon and eBay users followers and friends count
+#used null as dataframe since we are plotting from two different dataframe 
+ggplot(NULL, aes(friends_count, followers_count)) +
+  geom_point(data = amazon_df_select, aes(col = "Amazon")) +
+  geom_line(data = ebay_df_select, aes(col = "eBay"))+
+  #used scale_y_continuous to change any scientific figure for y-axis
+scale_y_continuous(labels = comma)+
+  #used labs for labelling
+  labs( x = "friends count", 
+        y = "followers count",
+        title = "Scatterplot for Amazon and eBay Users Followers and Friends Count",
+        subtitle = "Comparing Relationship between Amazon and eBay User's friend and followers count",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #amazon and #ebay") +
+  #used lim(x and y)to customize the axis
+  xlim(0, 10000) +
+  ylim(0, 10000)+
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12))  
+
+```
+The increase of users followers depend on their friends count, that is they depend on each others , especially ebay.
+B. Time series Visualization for amazon
+```{r}
+#using ts_plot for time series analysis in amazon data of column created_at, as ts_plot is a function in rtweet
+ts_plot(amazon_df_select,by="hour")
+```
+The time peak for amazon hash tag is 15:00pm,which shows how serious the purpose of the tweet,and falls at 19:00pm
+```{r}
+#using ts_plot for time series analysis in amazon data of column created_at,as ts_plot is a function in rtweet
+ts_plot(ebay_df_select,by="hour")
+```
+The time peak for eBay hash tag is about 16:00 unlike that of amazon that was 15:00, while the tweets falls at 18:30
+C.Bar Chart for Users Location
+```{r}
+#search for the columns that are empty and labelled them as NA
+amazon_df_select$location[amazon_df_select$location==""] <- NA
+amazon_location <- amazon_df_select %>% 
+  #edit the location name and combined similar location with name together using recode
+  mutate(location_edit =recode(location,"London" = "London,United Kingdom","Crown Heights, Brooklyn"="Brooklyn,United States","Minnesota & Texas"="Texas,United States","United State"="United States","New York, USA"="New York,United States","USA"="United States","Oak Lawn, IL"="lL,United States","Tarpon Springs, FL"="Tarpon,United States","uk"="United Kingdom","Midwest"="United States","Hinesville, Georgia"="United States","England"="United Kingdom","Hertfordshire "="United Kingdom","US"="United States","England"="United Kingdom","TOKYO"="Tokyo,Japan","New York, NY"="New York,United States","Plano, TX"="Texas,United States","London"="London, United Kingdom","⬇️Latest Deals⬇️HappySavings⬇️" = "Global" ,"Worldwide"= "Global"))
+#counting the unique location and frequency of the location
+amazon_location %>%
+  count(location_edit) %>%
+  arrange(desc(n)) %>%
+  #removed the empty columns that was replaced with NA
+  na.omit()%>%
+  #the top five location 
+  head(n=5) %>%
+  ggplot(aes(x=reorder(location_edit, -n), y=n)) +
+  #plotting it with ggplot using geom_bar
+  geom_bar(stat="identity",fill="black", colour="black") +
+  labs(x="Location", y="Frequency") +
+  theme(axis.text.x=element_text(angle=15, hjust=1))+
+  #used scale_y_continuous to change any scientific figure for y-axis
+scale_y_continuous(labels = comma)+
+  #used labs for labelling
+  labs( x = "Amazon users Location", 
+        y = "Count",
+        title = "Top five countries that tweeted Amazon hashtag",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #amazon") +
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12)) 
+  
+```
+ebay Location
+```{r}
+#search for the columns that are empty and labelled them as NA
+ebay_df_select$location[ebay_df_select$location==""] <- NA
+ebay_location <- ebay_df_select %>% 
+  #edit the location name and combined similar location with name together using recode
+  mutate(location_edit =recode(location,"UK" = "United Kingdom","Crown Heights, Brooklyn"="Brooklyn,United States","Minnesota & Texas"="Texas,United States","United State"="United States","New York, USA"="New York,United States","USA"="United States","Oak Lawn, IL"="lL,United States","Tarpon Springs, FL"="Tarpon,United States","uk"="United Kingdom","Midwest"="United States","Hinesville, Georgia"="United States","England"="United Kingdom","Hertfordshire "="United Kingdom","US"="United States","England"="United Kingdom","TOKYO"="Tokyo,Japan","New York, NY"="New York,United States","Plano, TX"="Texas,United States","London"="London, United Kingdom","⬇️Latest Deals⬇️HappySavings⬇️" = "Global" ,"Worldwide"= "Global"))
+		
+ebay_location %>%
+  #counting the unique location and frequency of the location
+  count(location_edit) %>%
+  arrange(desc(n)) %>%
+   #removed the empty columns that was replaced with NA
+  na.omit()%>%
+   #the top five location
+  head(n=5) %>%
+   #plotting the graph with ggplot using geom_bar
+  ggplot(aes(x=reorder(location_edit, -n), y=n)) +
+  geom_bar(stat="identity",fill="black", colour="black") +
+  labs(x="Location", y="Frequency") +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=45, hjust=1))+
+#used scale_y_continuous to change any scientific figure for y-axis
+scale_y_continuous(labels = comma)+
+  #used labs for labelling
+  labs( x = "eBay users Location", 
+        y = "Count",
+        title = "Top five countries that tweeted eBay hashtag",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #eBay") +
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12)) 
+```
+
+```{r}
+#created a new dataframe for top location that tweeted amazon word
+amazon_count=count(amazon_location,location_edit)
+amazon_location_edit=amazon_location$location_edit
+data_new <- amazon_count[order(amazon_count$n, decreasing = TRUE), ]  
+#created a new dataframe with the data_frame function
+data = data_frame(data_new)
+
+amazon_location_new <- data %>%                                      
+  arrange(desc(n)) %>%
+  #used slice function to get the first 43set
+  slice(1:4)
+amazon_location_new
+```
+
+```{r}
+#created a new dataframe for top location that tweeted amazon word
+ebay_count=count(ebay_location,location_edit)
+ebay_location_edit=ebay_location$location_edit
+data_neww <- ebay_count[order(ebay_count$n, decreasing = TRUE), ] 
+#created a new dataframe with the data_frame function
+dataa = data_frame(data_neww)
+
+ebay_location_new <- dataa %>%                                      
+  arrange(desc(n)) %>%
+  #used slice function to get the first 3set
+  slice(1:4)
+ebay_location_new
+```
+
+
+```{r}
+#using geom_bar to plot their users location
+ggplot(NULL, aes(location_edit,n)) + 
+  geom_bar(aes(fill = "Amazon"), data = amazon_location_new,stat='identity',position="stack")+
+  coord_flip()+
+   geom_bar(aes(fill = "eBay"), data =ebay_location_new,stat='identity',position="stack")+
+  #used scale_y_continuous to change any scientific figure for y-axis
+scale_y_continuous(labels = comma)+
+  #used labs for labelling
+  labs( x = "Users Location", 
+        y = "count",
+        title = "Barplot for Amazon and eBay Users Location",
+        subtitle = "Comparing Top 3 Location of Amazon and eBay User's Location",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #amazon and #ebay") +
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12))
+
+  
+```
+
+D. most tweeted screenname
+Amazon
+```{r}
+#plotting the top 5 of the screename related to amazon hashtag
+amazon_df_select %>%
+  #count the unique screenname and the number of time they appeared
+  count(screen_name, sort = TRUE) %>%
+  mutate(screen_name= reorder(screen_name,n)) %>%
+  #top 5
+  head(5) %>%
+  ggplot(aes(x = unique(screen_name),y = n)) +
+  #used rainbow color for the color
+  geom_col(col=rainbow(5))  +
+  labs(x = "Screename",
+       y = "Frequency",
+       caption = "Data gotten via Twitter Rest API using hash tag #amazon",
+       title = "Amazon Tweeter Screen Name") + 
+  theme(axis.text = element_text(size = 10, color = "black"), 
+        axis.title = element_text(size = 10, color = "black"),
+        title = element_text(size = 10))
+```
+
+screenname for ebay
+```{r}
+#plotting the top 5 of the screename related to amazon hashtag
+ebay_df_select %>%
+  #count the unique screenname and the number of time they appeared
+  count(screen_name, sort = TRUE) %>%
+  mutate(screen_name= reorder(screen_name,n)) %>%
+  #top 5
+  head(5) %>%
+  ggplot(aes(x = unique(screen_name),y = n)) +
+  #used rainbow color for the color
+  geom_col(col = rainbow(5)) +
+  labs(x = "Screename",
+       y = "Frequency",
+       caption="Data gotten via Twitter Rest API using hash tag #amazon",
+       title = "eBay Tweeter Screen Name") + 
+  theme(axis.text = element_text(size = 10, color = "black"), 
+        axis.title = element_text(size = 10, color = "black"),
+        title = element_text(size = 10))
+```
+creating a new dataframe for most appeared screename to combine them together for a graph
+```{r}
+screen_ebay_count=count(ebay_df_select,screen_name)
+screen_data_neww <- screen_ebay_count[order(screen_ebay_count$n, decreasing = TRUE), ]  
+screen_dataa = data_frame(screen_data_neww)
+
+ebay_screen_new <- screen_dataa %>%                                      
+  arrange(desc(n)) %>%
+  slice(1:3)
+#amazon
+screen_amazon_count=count(amazon_df_select,screen_name)
+screen_data_new <- screen_amazon_count[order(screen_amazon_count$n, decreasing = TRUE), ]  
+screen_data = data_frame(screen_data_new)
+
+amazon_screen_new <- screen_data %>%                                      
+  arrange(desc(n)) %>%
+  slice(1:3)
+
+```
+
+plotting most appear screen name for amazon and ebay
+```{r}
+#using null because we are plotting two dataframe together
+ggplot(NULL, aes(screen_name,n)) + 
+  geom_col(aes(fill = "Amazon"), data = amazon_screen_new,position="stack")+
+   geom_col(aes(fill = "eBay"), data =ebay_screen_new,position="stack")+
+coord_flip()+
+  #used scale_y_continuous to change any scientific figure for y-axis
+scale_y_continuous(labels = comma)+
+  #used labs for labelling
+  labs( x = "Screen name", 
+        y = "Count",
+        title = "The most appeared screen name for Amazon and ebay",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #amazon and #ebay") +
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12))
+
+```
+
+E. most used words in Amazon 
+```{r}
+
+#Here we get to apply our clean_tweet function and also divide the text into words
+amazon_df_select$words=clean_tweets(amazon_df_select$text) 
+amazon_df_d <- amazon_df_select %>%
+  select(words) %>%
+  unnest_tokens(word,words)
+#Here we get to remove the stop words from the sentences, which we have divided into words , to get accurate result for our word counts , samples of stop words include is, are, at , where, of , in etc.
+words_clean <- amazon_df_d %>%
+  anti_join(stop_words)
+words_clean$word[words_clean$word=="clickgtgt"]<- NA
+#plotting the top five most used words
+words_clean %>%
+  count(word,sort=TRUE)%>%
+  top_n(6)%>%
+  mutate(word=reorder(word,n))%>%
+  na.omit()%>%
+  ggplot(aes(x=word,y=n)) +
+  geom_col()+
+  xlab(NULL)+
+  coord_flip()+
+  theme_classic()+
+  labs(x="unique words",
+       y="count",
+       title ="Amazon Unique words")
+```
+
+Most used words in ebay
+```{r}
+#Here we used our function clean_tweet and get to divide the text into words
+ebay_df_select$textt=clean_tweets(ebay_df_select$text) 
+ebay_df_d <- ebay_df_select %>%
+  select(textt) %>%
+  unnest_tokens(word,textt)
+#Here we get to remove the stop words from the sentences, which we have divided into words , to get accurate result for our word counts , samples of stop words include is, are, at , where, of , in etc.
+words_clean_ebay <- ebay_df_d %>%
+   anti_join(stop_words)
+#plotting the five top words most used
+words_clean_ebay %>%
+  count(word,sort=TRUE)%>%
+  top_n(5)%>%
+  mutate(word=reorder(word,n))%>%
+  ggplot(aes(x=word,y=n)) +
+  geom_col()+
+  xlab(NULL)+
+  coord_flip()+
+  theme_classic()+
+  labs(x="unique words",
+       y="count",
+       title ="eBay Unique words")
+```
+
+F. Word network Analysis for ebay
+The purpose of this analysis is to get the most used two paired words
+```{r}
+#here we paired the words into two most common words
+ebay_df_paired <- ebay_df_select %>%
+  dplyr::select(textt) %>%
+  unnest_tokens(paired_words,textt, token ="ngrams", n=2)
+ebay_df_paired%>%
+  count(paired_words, sort = TRUE)
+```
+
+
+```{r}
+#fitering here and removing the stop words
+ebay_paired_words_seperate <- ebay_df_paired %>%
+  separate(paired_words, c("word1", "word2"), sep = " ")
+
+ebay_words_filtered <- ebay_paired_words_seperate%>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+
+# new bigram counts:
+ebay_words_counts <- ebay_words_filtered %>%
+  count(word1, word2, sort = TRUE)
+
+head(ebay_words_counts)
+```
+```{r}
+library(ggraph)
+# (plotting graph edges is currently broken)
+ebay_words_counts %>%
+        filter(n >= 24) %>%
+        graph_from_data_frame() %>%
+        ggraph(layout = "fr") +
+        # geom_edge_link(aes(edge_alpha = n, edge_width = n))
+        # geom_edge_link(aes(edge_alpha = n, edge_width = n)) +
+        geom_node_point(color = "darkslategray4", size = 3) +
+        geom_node_text(aes(label = name), vjust = 1.8, size = 2) +
+        labs(title = "Word Network: ebay related tweet",
+             subtitle = "Ebay related Tweet",
+             x = "", y = "")
+```
+
+
+word network amazon
+The purpose of this analysis is to get the most used two paired words
+```{r}
+amazon_df_paired <- amazon_df_select %>%
+  dplyr::select(words) %>%
+  unnest_tokens(paired_words,words, token ="ngrams", n=2)
+amazon_df_paired%>%
+  count(paired_words, sort = TRUE)
+```
+
+
+```{r}
+#removing stop words
+amazon_paired_words_seperate <- amazon_df_paired %>%
+  separate(paired_words, c("word1", "word2"), sep = " ")
+
+amazon_words_filtered <- amazon_paired_words_seperate%>%
+  filter(!word1 %in% stop_words$word) %>%
+  filter(!word2 %in% stop_words$word)
+
+# new bigram counts:
+amazon_words_counts <- amazon_words_filtered %>%
+  count(word1, word2, sort = TRUE)
+
+head(amazon_words_counts)
+```
+```{r}
+# plot amazon word network
+# (plotting graph edges is currently broken)
+amazon_words_counts %>%
+        filter(n >= 24) %>%
+        graph_from_data_frame() %>%
+        ggraph(layout = "fr") +
+        # geom_edge_link(aes(edge_alpha = n, edge_width = n))
+        # geom_edge_link(aes(edge_alpha = n, edge_width = n)) +
+        geom_node_point(color = "darkslategray4", size = 3) +
+        geom_node_text(aes(label = name), vjust = 1.8, size = 2) +
+        labs(title = "Word Network: Amazon related tweet",
+             subtitle = "Amazon related Tweet",
+             x = "", y = "")
+```
+G. Wordcloud for amazon
+```{r}
+library(tm)
+docs <- Corpus(VectorSource(words_clean))
+dtm <- TermDocumentMatrix(docs) 
+matrix <- as.matrix(dtm) 
+words <- sort(rowSums(matrix),decreasing=TRUE) 
+df <- data.frame(word = names(words),freq=words)
+```
+
+```{r}
+library(wordcloud)
+set.seed(1234) # for reproducibility 
+wordcloud(words = df$word, freq = df$freq, min.freq = 1,           max.words=200, random.order=FALSE, rot.per=0.35, scale=c(3.5,0.25),           colors=brewer.pal(8, "Dark2"))
+wordcloud2(data=df, size=1.6, color='random-dark')
+```
+
+Word cloud for ebay
+G. Wordcloud for amazon
+```{r}
+docs <- Corpus(VectorSource(words_clean_ebay))
+dtm <- TermDocumentMatrix(docs) 
+matrix <- as.matrix(dtm) 
+words <- sort(rowSums(matrix),decreasing=TRUE) 
+df <- data.frame(word = names(words),freq=words)
+```
+
+```{r}
+set.seed(1234) # for reproducibility 
+wordcloud(words = df$word, freq = df$freq, min.freq = 1,           max.words=200, random.order=FALSE, rot.per=0.35, scale=c(3.5,0.25),           colors=brewer.pal(8, "Dark2"))
+wordcloud2(data=df, size=3.0)
+```
+
+Step 4
+Sentimental Analysis for Amazon
+```{r}
+library(syuzhet)
+tweets <- iconv(words_clean)
+amazon_setiment <- get_nrc_sentiment(tweets)
+head(amazon_setiment)
+```
+```{r}
+colnames(amazon_setiment)
+```
+
+```{r}
+barplot(colSums(amazon_setiment),
+        las = 2,
+        col = rainbow(10),
+        ylab = 'Count',
+        main = 'Amazon Sentiment Scores Tweets')
+```
+```{r}
+bing_word_counts <- words_clean %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) 
+head(bing_word_counts)
+#
+#
+# Finally, plot top words
+#
+bing_word_counts %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(title = "Most common Positive and Negative words in tweets on Amazon",
+       y = "Sentiment",
+       x = NULL) +
+  theme(axis.text = element_text(size = 10, color = "black"), 
+        axis.title = element_text(size = 10, color = "black"),
+        title = element_text(size = 10))
+```
+```{r}
+amazon_positive = amazon_setiment['positive']
+amazon_negative = amazon_setiment['negative']
+amazon_sentiment_df = data.frame(amazon_positive,amazon_negative) 
+amazon_sentiment_df
+```
+
+```{r}
+amazon_sentiment_new_df = gather(
+  amazon_sentiment_df,
+  key = "Sentimental",
+  value = "Value",
+  na.rm = FALSE,
+  convert = FALSE,
+  factor_key = FALSE
+)
+amazon_sentiment_new_df
+```
+
+```{r}
+ggplot(amazon_sentiment_new_df,aes(Sentimental,Value))+
+  geom_col(fill="green")+#used scale_y_continuous to change any scientific figure for y-axis
+scale_y_continuous(labels = comma)+
+  #used labs for labelling
+  labs( x = "Sentimental", 
+        y = "Count",
+        title = "Sentimental score of Amazon on Twitter",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #amazon") +
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12))
+
+```
+
+
+sentimental analysis for eBay
+```{r}
+tweets <- iconv(words_clean_ebay)
+ebay_sentiment <- get_nrc_sentiment(tweets)
+head(ebay_sentiment)
+```
+```{r}
+barplot(colSums(ebay_sentiment),
+        las = 2,
+        col = rainbow(10),
+        ylab = 'Count',
+        main = 'eBay Sentiment Scores Tweets')
+```
+
+```{r}
+bing_word_counts <- words_clean_ebay %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  mutate(word = reorder(word, n)) 
+head(bing_word_counts)
+#
+#
+# Finally, plot top words
+#
+bing_word_counts %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(title = "Most common Positive and Negative words in tweets on eBay",
+       y = "Sentiment",
+       x = NULL) +
+  theme(axis.text = element_text(size = 10, color = "black"), 
+        axis.title = element_text(size = 10, color = "black"),
+        title = element_text(size = 10))
+```
+
+```{r}
+ebay_positive = ebay_sentiment['positive']
+ebay_negative = ebay_sentiment['negative']
+ebay_sentiment_df = data.frame(ebay_positive,ebay_negative) 
+ebay_sentiment_df
+```
+```{r}
+ebay_sentiment_new_df = gather(
+  ebay_sentiment_df,
+  key = "Sentimental",
+  value = "Value",
+  na.rm = FALSE,
+  convert = FALSE,
+  factor_key = FALSE
+)
+ebay_sentiment_new_df
+
+```
+```{r}
+ggplot(ebay_sentiment_new_df,aes(Sentimental,Value))+
+  geom_col(fill="black")+labs( x = "Sentimental", 
+        y = "Count",
+        title = "Sentimental score of eBay on Twitter",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #ebay") +
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12))
+```
+
+conclusion:
+```{r}
+ggplot(NULL, aes(Sentimental,Value)) + 
+  geom_bar(aes(fill = "Amazon"), data = amazon_sentiment_new_df,stat='identity',position="stack")+
+   geom_bar(aes(fill = "eBay"), data =ebay_sentiment_new_df,stat='identity',position="stack")+
+labs( x = "Sentimental", 
+        y = "Count",
+        title = "Sentimental score of Amazon and eBay on Twitter",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #amazon and #ebay") +
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12))
+```
+
+Step 5 
+Statistical test
+A.correlation: the relationship between number of followers and number of friends for Amazon Data
+```{r}
+# Correlation between number of followers and number of friends
+ggplot(data=amazon_df, aes(x=followers_count, y=friends_count)) +
+  geom_point(alpha=0.1) + 
+  xlim(0, quantile(amazon_df$followers_count, 0.95, na.rm=TRUE,colors="yellow")) +
+  ylim(0, quantile(amazon_df$friends_count, 0.95, na.rm=TRUE)) + 
+  geom_smooth(method="lm", color="red") +
+  theme_bw() +
+  labs(x="Number of followers", y="Number of friends",
+        title = "Correlation of Followers count and friends count of Amazon on Twitter",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #amazon") +
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12))
+```
+
+The relationship between number of followers and number of friends for Amazon Data
+```{r}
+# Correlation between number of followers and number of friends
+ggplot(data=ebay_df, aes(x=followers_count, y=friends_count)) +
+  geom_point(alpha=0.1) + 
+  xlim(0, quantile(amazon_df$followers_count, 0.95, na.rm=TRUE)) +
+  ylim(0, quantile(amazon_df$friends_count, 0.95, na.rm=TRUE)) + 
+  geom_smooth(method="lm", color="red") +
+  theme_bw() +
+  labs(x="Number of followers", y="Number of friends",title = "Correlation of eBay Followers count and friends count on Twitter",
+        caption = "Source: Data collected from Twitter's REST API via rtweet,using #ebay") +
+  theme(axis.text.x = element_text(size = 10), 
+        axis.text.y = element_text(size = 10), 
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        legend.text = element_text(size = 10),
+        title = element_text(size = 12)) 
+```
+
+Ttest
+In this t-test, we used users based on their number of followers in two dataset (g1 and g2). Then with each user from amazon in g1, another user in ebay for g2 were matched based on their profile 
+```{r}
+twitter_test = t.test(amazon_df_select$followers_count, ebay_df_select$followers_count, alternative = "two.sided", var.equal = FALSE)
+twitter_test
+```
+The p-value is greater than 0.05, then there is no underlying difference in followers count of Amazon and followers count of ebay.
+
+Therefore, our conclusion is that the data supply evidence shows
+that there is no underlying difference in mean follwers count between amazon and ebay.
+
+
+citation packages
+Hadley Wickham (2017). tidyverse: Easily Install and Load the ‘Tidyverse’. R package version 1.2.1. https://CRAN.R-project.org/package=tidyverse
+
+
+
